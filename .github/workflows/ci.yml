@@ -12,7 +12,7 @@ env:
 
 jobs:
   lint:
-    name: '🔍 Lint'
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,13 +20,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      - name: 安装依赖
-        run: npm ci
-      - name: ESLint 检查
+      - name: Install dependencies
+        run: npm install
+      - name: ESLint check
         run: npm run lint
 
   build:
-    name: '🔨 Build'
+    name: Build
     needs: lint
     runs-on: ubuntu-latest
     env:
@@ -39,22 +39,22 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      - name: 安装依赖
-        run: npm ci
-      - name: 构建
+      - name: Install dependencies
+        run: npm install
+      - name: Build
         run: npm run build
-      - name: 验证构建产物
+      - name: Verify build output
         run: |
           if [ -d ".next" ]; then
-            echo "✅ .next 构建目录已生成"
+            echo "Build output .next/ generated"
             du -sh .next/
           else
-            echo "❌ .next 构建目录未生成"
+            echo "Build output .next/ not generated"
             exit 1
           fi
 
   release:
-    name: '🚀 发布'
+    name: Release
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
@@ -65,7 +65,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 生成版本号
+      - name: Generate version
         id: version
         run: |
           DATE=$(date +'%Y%m%d')
@@ -73,24 +73,24 @@ jobs:
           echo "version=v1.0.${COUNT}-${DATE}" >> $GITHUB_OUTPUT
           echo "tag=v1.0.${COUNT}" >> $GITHUB_OUTPUT
 
-      - name: 生成变更日志
+      - name: Generate changelog
         run: |
           echo "# SleepQuiz ${{ steps.version.outputs.version }}" > CHANGELOG.md
           echo "" >> CHANGELOG.md
-          echo "## 技术栈" >> CHANGELOG.md
+          echo "## Tech Stack" >> CHANGELOG.md
           echo "- Next.js 16 + React 19" >> CHANGELOG.md
           echo "- TypeScript + Tailwind CSS 4" >> CHANGELOG.md
           echo "- Supabase + next-intl" >> CHANGELOG.md
           echo "" >> CHANGELOG.md
-          echo "## 统计" >> CHANGELOG.md
-          echo "- .tsx/.ts 文件: $(find src -name '*.tsx' -o -name '*.ts' 2>/dev/null | wc -l) 个" >> CHANGELOG.md
-          echo "- 代码行数: $(find src -name '*.tsx' -o -name '*.ts' -exec cat {} + 2>/dev/null | wc -l)" >> CHANGELOG.md
+          echo "## Stats" >> CHANGELOG.md
+          echo "- .tsx/.ts files: $(find src -name '*.tsx' -o -name '*.ts' 2>/dev/null | wc -l)" >> CHANGELOG.md
+          echo "- Lines of code: $(find src -name '*.tsx' -o -name '*.ts' -exec cat {} + 2>/dev/null | wc -l)" >> CHANGELOG.md
           echo "" >> CHANGELOG.md
-          echo "## 提交历史" >> CHANGELOG.md
+          echo "## Commits" >> CHANGELOG.md
           echo "" >> CHANGELOG.md
           git log --oneline -20 >> CHANGELOG.md
 
-      - name: 创建 Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
