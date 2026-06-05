@@ -1,0 +1,102 @@
+name: SleepQuiz CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  lint:
+    name: '🔍 Lint'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: 安装依赖
+        run: npm ci
+      - name: ESLint 检查
+        run: npm run lint
+
+  build:
+    name: '🔨 Build'
+    needs: lint
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: 安装依赖
+        run: npm ci
+      - name: 构建
+        run: npm run build
+      - name: 验证构建产物
+        run: |
+          if [ -d ".next" ]; then
+            echo "✅ .next 构建目录已生成"
+            du -sh .next/
+          else
+            echo "❌ .next 构建目录未生成"
+            exit 1
+          fi
+
+  release:
+    name: '🚀 发布'
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 生成版本号
+        id: version
+        run: |
+          DATE=$(date +'%Y%m%d')
+          COUNT=$(git rev-list --count HEAD)
+          echo "version=v1.0.${COUNT}-${DATE}" >> $GITHUB_OUTPUT
+          echo "tag=v1.0.${COUNT}" >> $GITHUB_OUTPUT
+
+      - name: 生成变更日志
+        run: |
+          echo "# SleepQuiz ${{ steps.version.outputs.version }}" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## 技术栈" >> CHANGELOG.md
+          echo "- Next.js 16 + React 19" >> CHANGELOG.md
+          echo "- TypeScript + Tailwind CSS 4" >> CHANGELOG.md
+          echo "- Supabase + next-intl" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## 统计" >> CHANGELOG.md
+          echo "- .tsx/.ts 文件: $(find src -name '*.tsx' -o -name '*.ts' 2>/dev/null | wc -l) 个" >> CHANGELOG.md
+          echo "- 代码行数: $(find src -name '*.tsx' -o -name '*.ts' -exec cat {} + 2>/dev/null | wc -l)" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## 提交历史" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log --oneline -20 >> CHANGELOG.md
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
