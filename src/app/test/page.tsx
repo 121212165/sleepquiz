@@ -7,8 +7,6 @@ import { quizQuestions } from '@/lib/quiz-data';
 import { assessSleep } from '@/lib/sleep-engine';
 import type { QuizAnswer } from '@/types/test';
 
-// Build question data with text from a simple inline map
-// (In production, these would come from i18n)
 const questionTexts: Record<string, string> = {
   c1: '如果没有任何约束，你最自然的起床时间是？',
   c2: '早上醒来后的第一个小时内，你的状态是？',
@@ -48,27 +46,12 @@ export default function TestPage() {
   }));
 
   const handleComplete = useCallback(
-    async (answers: QuizAnswer[]) => {
+    (answers: QuizAnswer[]) => {
       setIsLoading(true);
-      try {
-        const result = assessSleep(answers);
-
-        // Save to API
-        const res = await fetch('/api/result', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers, result }),
-        });
-
-        const data = await res.json();
-        router.push(`/result/${data.id}`);
-      } catch {
-        // Fallback: generate a local ID and pass result via sessionStorage
-        const id = crypto.randomUUID();
-        const result = assessSleep(answers);
-        sessionStorage.setItem(`result-${id}`, JSON.stringify(result));
-        router.push(`/result/${id}`);
-      }
+      const result = assessSleep(answers);
+      const id = crypto.randomUUID();
+      sessionStorage.setItem(`result-${id}`, JSON.stringify(result));
+      router.push(`/result?id=${id}`);
     },
     [router]
   );

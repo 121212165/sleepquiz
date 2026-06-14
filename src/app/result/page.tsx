@@ -1,3 +1,7 @@
+'use client';
+
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ResultDashboard from '@/components/result/ResultDashboard';
 import type { Chronotype } from '@/types/test';
 
@@ -50,39 +54,23 @@ const chronotypeData: Record<string, ChronotypeInfo> = {
   },
 };
 
-const qualityLabels: Record<string, string> = {
-  excellent: '优秀',
-  good: '良好',
-  fair: '一般',
-  poor: '较差',
-};
+function ResultContent() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
+  const [resultData] = useState(() => {
+    if (typeof window === 'undefined' || !id) return null;
+    const stored = sessionStorage.getItem(`result-${id}`);
+    return stored ? JSON.parse(stored) : null;
+  });
 
-export default async function ResultPage({
-  params,
-}: {
-  params: Promise<{ locale: string; id: string }>;
-}) {
-  const { id } = await params;
-
-  // Try to fetch from API, fallback to placeholder
-  let resultData = null;
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/result?id=${id}`, {
-      cache: 'no-store',
-    });
-    if (res.ok) {
-      const data = await res.json();
-      resultData = data.result;
-    }
-  } catch {
-    // Will use client-side fallback
-  }
-
-  if (!resultData) {
+  if (!id || !resultData) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-indigo-950 via-blue-950 to-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-slate-400">结果加载中...请稍候</p>
+          <p className="text-slate-400 mb-4">未找到测试结果</p>
+          <a href="/test" className="text-indigo-400 hover:text-indigo-300 underline">
+            去做测试 →
+          </a>
         </div>
       </main>
     );
@@ -103,13 +91,24 @@ export default async function ResultPage({
           },
           quality: {
             score: resultData.quality.score,
-            level: qualityLabels[resultData.quality.level] || resultData.quality.level,
+            level: resultData.quality.level,
             breakdown: resultData.quality.breakdown,
           },
           overallScore: resultData.overallScore,
         }}
-        resultId={id}
       />
     </main>
+  );
+}
+
+export default function ResultPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-gradient-to-b from-indigo-950 via-blue-950 to-slate-950 flex items-center justify-center">
+        <p className="text-slate-400">加载中...</p>
+      </main>
+    }>
+      <ResultContent />
+    </Suspense>
   );
 }
